@@ -17,7 +17,7 @@ our @EXPORT_OK = qw(value_exists trim_series get_label create_uid get_length get
 
 my $script = "BenchPostprocess";
 
-# always use this for labels in the hashes for JSON data
+# always use this for labels in the hashes for JSON data.
 sub get_label {
 	my $key = shift;
 	my %labels = (
