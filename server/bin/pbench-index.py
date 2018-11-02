@@ -19,17 +19,9 @@ from argparse import ArgumentParser
 from configparser import ConfigParser, Error as ConfigParserError, \
         NoSectionError, NoOptionError
 
-# Correct the first path to be the "lib" directory to make the
-# pbench-base.sh script simple, allowing the imports from the
-# pbench library to work cleanly.
-first_path = sys.path[0]
-assert first_path.endswith('/bin')
-lib_path = os.path.join(os.path.dirname(first_path), 'lib')
-sys.path[0] = lib_path
-
 from pbench import tstos, get_es, es_index, es_put_template, PbenchConfig, \
         BadConfig, get_pbench_logger, quarantine, JsonFileError, \
-        PbenchTemplates, TemplateError, report_status
+        PbenchTemplates, TemplateError, report_status, _rename_tb_link
 
 
 _NAME_ = "pbench-index"
@@ -2905,24 +2897,6 @@ class IdxContext(object):
         if dump:
             self.logger.error("** Errors encountered while indexing: {}",
                     json.dumps(self.opctx, sort_keys=True))
-
-
-def _rename_tb_link(tb, dest, logger):
-    try:
-        os.mkdir(dest)
-    except FileExistsError:
-        # directory already exists, ignore
-        pass
-    except Exception:
-        logger.exception("os.mkdir: Unable to create tar ball destination directory: %s", dest)
-        raise
-    tbname = os.path.basename(tb)
-    tbnewname = os.path.join(dest, tbname)
-    try:
-        os.rename(tb, tbnewname)
-    except Exception:
-        logger.exception("os.rename: Unable to move tar ball link %s to destination directory: %s", tb, dest)
-        raise
 
 def _count_lines(fname):
     try:

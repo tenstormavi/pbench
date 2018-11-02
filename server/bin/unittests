@@ -542,6 +542,12 @@ declare -A cmds=(
     [test-6.5]="_run pbench-backup-tarballs"
     # real dest directory, no files needing backup - corrupted archive should not be copied
     [test-6.6]="_run pbench-backup-tarballs"
+    # Upload fail since s3 already have the result
+    [test-6.7]="_run pbench-backup-tarballs"
+    # Upload successful
+    [test-6.8]="_run pbench-backup-tarballs"
+    # Upload fail since md5 corrupt
+    [test-6.9]="_run pbench-backup-tarballs"
 
     # indexing tests are all test-7.*
 
@@ -607,6 +613,8 @@ declare -A cmds=(
     [test-9.4]="_run pbench-verify-backup-tarballs"
     # bad md5 in backup
     [test-9.5]="_run pbench-verify-backup-tarballs"
+    # more tarballs in s3
+    [test-9.6]="_run pbench-verify-backup-tarballs"
 
     # trivial results: no mail
     [test-10]="_run pbench-sync-satellite satellite-one"
