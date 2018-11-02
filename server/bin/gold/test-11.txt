@@ -61,6 +61,10 @@ lrwxrwxrwx         70 users -> /var/tmp/pbench-test-server/test-11/pbench-satell
 drwxrwxr-x          - archive
 drwxrwxr-x          - archive/fs-version-001
 drwxrwxr-x          - archive/fs-version-001/ONE::controller
+drwxrwxr-x          - archive/fs-version-001/ONE::controller/BACKED-UP
+drwxrwxr-x          - archive/fs-version-001/ONE::controller/BACKED-UP-FAILED
+drwxrwxr-x          - archive/fs-version-001/ONE::controller/BACKED-UP-LOCAL
+drwxrwxr-x          - archive/fs-version-001/ONE::controller/BACKED-UP-S3
 drwxrwxr-x          - archive/fs-version-001/ONE::controller/BAD-MD5
 drwxrwxr-x          - archive/fs-version-001/ONE::controller/COPIED-SOS
 drwxrwxr-x          - archive/fs-version-001/ONE::controller/INDEXED
