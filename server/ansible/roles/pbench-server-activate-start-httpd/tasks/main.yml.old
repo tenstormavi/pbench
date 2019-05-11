@@ -1,0 +1,7 @@
+---
+# Now that the server bits and the config file are installed, activate the server.
+- name: activate the server - create results dir structure
+  command: pbench-server-activate-create-results-dir-structure
+  environment:
+        PATH: "{{ ansible_env.PATH }}:/opt/pbench-server/bin"
+        CONFIG: "/opt/pbench-server/lib/config/pbench-server.cfg"

@@ -1,8 +1,11 @@
 ---
+# Install config file for pbench agent or server (the inventory file specifies which).
+
 - name: install the config file
   get_url:
         url: "{{ configurl }}"
         dest: "{{ configdest }}"
-        mode: 0644
+        mode: 0444
         owner: "{{ owner }}"
         group: "{{ group }}"
+

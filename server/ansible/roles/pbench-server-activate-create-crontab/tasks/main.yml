@@ -1,0 +1,6 @@
+---
+- name: create crontab
+  command: pbench-server-activate-create-crontab /opt/pbench-server/lib/crontab
+  environment:
+     PATH: "{{ ansible_env.PATH }}:/opt/pbench-server/bin"
+     CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg

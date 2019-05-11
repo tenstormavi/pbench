@@ -1,0 +1,14 @@
+---
+- name: uninstall pbench-server
+  hosts: servers
+  remote_user: root
+  become: yes
+  become_user: root
+
+  roles:
+    - pbench-server-deactivate-crontab
+    - pbench-server-deactivate-results-host-info
+    - pbench-server-uninstall
+
+
+

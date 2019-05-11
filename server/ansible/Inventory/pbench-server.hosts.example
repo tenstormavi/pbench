@@ -1,9 +1,19 @@
+# Change the [servers] section to the set of hosts where you want to
+# install pbench-server. The various hosts can be running any
+# combinations of RHEL7, RHEL8, or (supported) Fedora versions
+# (currently 28 and 29).  They will also have different configuration
+# files which can be specifified using the value of the cenv variable
+# (which is used to set the value of the
+# pbench_configuration_environment variable which is use to retrieve
+# the configuration file from the URL in configurl) - see below for an
+# example.
+
 [servers]
-host1
-host1sat
+host1            cenv=pbench-master
+host1sat         cenv=pbench-satellite
 
 [servers:vars]
-configurl = http://pbench.example.com/server/config/pbench-server.cfg
+configurl = http://pbench.example.com/server/config/{{ pbench_configuration_environment }}/pbench-server.cfg
 configdest = /opt/pbench-server/lib/config
 owner = pbench
 group = pbench
