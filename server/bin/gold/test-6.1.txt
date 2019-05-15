@@ -1,22 +1,5 @@
 +++ Running pbench-backup-tarballs
-Template:  pbench-unittests.v1.server-reports
-Index:  pbench-unittests-server-reports.1900-01 1
-len(actions) = 1
-[
-    {
-        "_id": "7bd36ca5be34ae707708dd6bbccd3b31",
-        "_index": "pbench-unittests-server-reports.1900-01",
-        "_op_type": "create",
-        "_source": {
-            "@timestamp": "1900-01-01T00:00:00",
-            "doctype": "status",
-            "name": "pbench-backup-tarballs",
-            "text": "pbench-backup-tarballs.py.1900-01-01T00:00:00-UTC(unit-test)\nTotal processed: 0, Locally backed-ed succesfully: 0, Failed to locally backed-up: 0, Uploaded to S3 succesfully: 0, Failed to upload to S3: 0, Quarantine: 0\n"
-        },
-        "_type": "pbench-server-reports"
-    }
-]
---- Finished pbench-backup-tarballs (status=0)
+--- Finished pbench-backup-tarballs (status=1)
 +++ Running unit test audit
 pbench-audit-server: Bad ARCHIVE=/var/tmp/pbench-test-server/test-6.1/pbench/archive/fs-version-001
 --- Finished unit test audit (status=1)
@@ -87,7 +70,7 @@ drwxrwxr-x          - public_html/users
 +++ pbench-local tree state (/var/tmp/pbench-test-server/test-6.1/pbench-local)
 drwxrwxr-x          - logs
 drwxrwxr-x          - logs/pbench-backup-tarballs
--rw-rw-r--       1134 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
+-rw-rw-r--        284 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
 drwxrwxr-x          - pbench-move-results-receive
 drwxrwxr-x          - pbench-move-results-receive/fs-version-001
 drwxrwxr-x          - pbench-move-results-receive/fs-version-002
@@ -143,12 +126,7 @@ drwxrwxr-x          - tmp
 +++ pbench log file contents
 ++++ pbench-local/logs
 +++++ pbench-backup-tarballs/pbench-backup-tarballs.log
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- start-1900-01-01T00:00:00-UTC
 1970-01-01T00:00:00.000000 ERROR pbench-backup-tarballs.pbench-backup-tarballs sanity_check -- The ARCHIVE directory /var/tmp/pbench-test-server/test-6.1/pbench/archive/fs-version-001, does not resolve /var/tmp/pbench-test-server/test-6.1/pbench/archive/fs-version-001 to a directory
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- Total processed: 0, Locally backed-ed succesfully: 0, Failed to locally backed-up: 0, Uploaded to S3 succesfully: 0, Failed to upload to S3: 0, Quarantine: 0
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ update_templates -- done templates (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, retries: 0)
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ report_status -- posted status (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, duplicates: 0, failures: 0, retries: 0)
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- end-1900-01-01T00:00:00-UTC
 ----- pbench-backup-tarballs/pbench-backup-tarballs.log
 ---- pbench-local/logs
 ++++ pbench-satellite-local/logs

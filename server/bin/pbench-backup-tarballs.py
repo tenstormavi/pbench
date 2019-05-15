@@ -11,18 +11,18 @@ import tempfile
 import pathlib
 from enum import Enum
 from argparse import ArgumentParser
-
+from s3backup import S3Config
+from functools import partial
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine
-from s3backup import S3Config
+
 
 _NAME_ = "pbench-backup-tarballs"
 
 # The link source and destination for this operation of this script.
 _linksrc = "TO-BACKUP"
+_linkdest = "BACKED-UP"
 
-# Global logger for the module, setup in main()
-_logger = None
 
 class Status(Enum):
     SUCCESS = 10
@@ -39,7 +39,19 @@ class Results(object):
         self.nquaran = nquaran
 
 
-def sanity_check(s3_obj, config, logger):
+def md5sum(filename):
+    """ Return the MD5 check-sum of a given file.
+
+    We don't want to read the entire file into memory, so we
+    use the technique at: https://stackoverflow.com/questions/7829499/using-hashlib-to-compute-md5-digest-of-a-file-in-python-3
+    """
+    with open(filename, mode='rb') as f:
+        d = hashlib.md5()
+        for buf in iter(partial(f.read, 128), b''):
+            d.update(buf)
+    return d.hexdigest()
+
+def sanity_check(config, logger):
 
     # make sure archive is present
     archive = config.ARCHIVE
@@ -98,14 +110,7 @@ def sanity_check(s3_obj, config, logger):
             'The QUARANTINE directory {}, does not resolve {} to a directory'.format(qdir, os.path.realpath(qdir)))
         return 1
 
-    # make sure the S3 bucket exists
-    try:
-        s3_obj.connector.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
-    except Exception as e:
-        logger.exception(
-            "Bucket: {} does not exist or you have no access. {}\n".format(s3_obj.bucket_name, e))
-        return 1
-
+    return 0
 
 def backup_to_local(config, logger, controller_path, controller, tb, tar, resultname, archive_md5, archive_md5_hex_value):
 
@@ -158,35 +163,38 @@ def backup_to_local(config, logger, controller_path, controller, tb, tar, result
                     "{} already exists in backup but md5 sums of archive and backup disagree\n".format(resultname))
                 return Status.FAIL
     else:
-        md5_done = tar_done = False
+        tar_done = False
 
         # copy the md5 file from archive to backup
         try:
             shutil.copy(archive_md5, backup_controller_path)
-            md5_done = True
         except Exception:
             # couldn't copy md5 file
+            md5_done = False
             logger.exception(
                 "shutil.copy: Unable to copy {} from archive to backup: {}\n".format(archive_md5, backup_controller_path))
+        else:
+            md5_done = True
 
         # copy the tarball from archive to backup
         if md5_done:
             try:
                 shutil.copy(tar, backup_controller_path)
-                tar_done = True
             except Exception:
                 # couldn't copy tarball
+                tar_done = False
                 logger.exception(
                     "shutil.copy: Unable to copy {} from archive to backup: {}\n".format(tar, backup_controller_path))
 
                 # remove the copied md5 file from backup
-                bmd5_file = "{}/{}.md5".format(
-                    backup_controller_path, resultname)
+                bmd5_file = os.path.join(backup_controller_path, "{}.md5".format(resultname))
                 if os.path.exists(bmd5_file):
                     try:
                         os.remove(bmd5_file)
                     except Exception:
                         logger.exception("Unable to remove: {}".format(bmd5_file))
+            else:
+                tar_done = True
 
         if md5_done and tar_done:
             logger.info(
@@ -195,8 +203,12 @@ def backup_to_local(config, logger, controller_path, controller, tb, tar, result
         else:
             return Status.FAIL
 
-
 def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultname, archive_md5_hex_value):
+    if s3_obj is None:
+        # Short-circuit operation when we don't have an S3 object to work with
+        # when executing.  This can happen when the expected bucket does not
+        # exist, or for other errors where we still want to backup locally.
+        return Status.FAIL
 
     s3_resultname = "{}/{}".format(controller, resultname)
 
@@ -242,7 +254,6 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
             logger.error(
                 "Failed to open tarball, {}\n".format(tar, e))
             return Status.FAIL
-
 
 def backup_data(s3_obj, config, logger):
     qdir = config.QDIR
@@ -294,37 +305,25 @@ def backup_data(s3_obj, config, logger):
 
         # match md5sum of the tarball to its md5 file
         try:
-            with open(tar, 'rb') as f:
-                adata = f.read()
-                try:
-                    archive_tar_hex_value = hashlib.md5(adata).hexdigest()
-                except Exception as e:
-                    quarantine(qdir, logger, tb)
-                    nquaran += 1
-                    logger.error(
-                        "Quarantine: {}, Unable to calculate the hexadecimal md5 value for {}, {}\n".format(tb, tar, e))
-                    continue
-        except (OSError, IOError) as e:
+            archive_tar_hex_value = md5sum(tar)
+        except Exception:
             # Could not read file.
             quarantine(qdir, logger, tb)
             nquaran += 1
-            logger.error(
-                "Quarantine: {}, Could not read {}, {}\n".format(tb, tar, e))
+            logger.exception(
+                "Quarantine: {}, Could not read {}\n".format(tb, tar))
             continue
-        else:
-            if archive_tar_hex_value == archive_md5_hex_value:
-                pass
-            else:
-                quarantine(qdir, logger, tb)
-                nquaran += 1
-                logger.error(
-                    "Quarantine: {}, md5sum of {} does not match with its md5 file {}\n".format(tb, tar, archive_md5))
-                continue
+
+        if archive_tar_hex_value != archive_md5_hex_value:
+            quarantine(qdir, logger, tb)
+            nquaran += 1
+            logger.error(
+                "Quarantine: {}, md5sum of {} does not match with its md5 file {}\n".format(tb, tar, archive_md5))
+            continue
 
         resultname = os.path.basename(tar)
         controller_path = os.path.dirname(tar)
         controller = os.path.basename(controller_path)
-        backup_controller_path = "{}/{}".format(config.BACKUP, controller)
 
         # This function call will handle all the local backup related
         # operations and count the number of success and failure.
@@ -354,27 +353,9 @@ def backup_data(s3_obj, config, logger):
 
         if local_backup_result == Status.SUCCESS \
             and s3_backup_result == Status.SUCCESS:
-            # moved to backed-up
+            # Move tar ball symlink to its final resting place
             _rename_tb_link(tb, os.path.join(
-                controller_path, "BACKED-UP"), logger)
-        elif local_backup_result == Status.SUCCESS \
-            and s3_backup_result == Status.FAIL:
-            # move to backed-up-local
-            _rename_tb_link(tb, os.path.join(
-                controller_path, "BACKED-UP-LOCAL"), logger)
-        elif local_backup_result == Status.FAIL \
-            and s3_backup_result == Status.SUCCESS:
-            # move to backed-up-S3
-            _rename_tb_link(tb, os.path.join(
-                controller_path, "BACKED-UP-S3"), logger)
-        elif local_backup_result == Status.FAIL \
-            and s3_backup_result == Status.FAIL:
-            # move tp backed-up-failed
-            _rename_tb_link(tb, os.path.join(
-                controller_path, "BACKED-UP-FAILED"), logger)
-        else:
-            assert False, "Logic bomb: cannot happen: local_backup_result = \
-                {}, s3_backup_result = {}".format(local_backup_result,                                           s3_backup_result)
+                controller_path, _linkdest), logger)
 
     return Results(ntotal=ntotal,
                    nbackup_success=nbackup_success,
@@ -383,39 +364,45 @@ def backup_data(s3_obj, config, logger):
                    ns3_fail=ns3_fail,
                    nquaran=nquaran)
 
-
-def main(parsed):
-    ret_status = 0
-    if not parsed.cfg_name:
+def main():
+    cfg_name = os.environ.get("CONFIG")
+    if not cfg_name:
         print("{}: ERROR: No config file specified; set CONFIG env variable or"
               " use --config <file> on the command line".format(_NAME_),
               file=sys.stderr)
         return 2
 
     try:
-        config = PbenchConfig(parsed.cfg_name)
+        config = PbenchConfig(cfg_name)
     except BadConfig as e:
         print("{}: {}".format(_NAME_, e), file=sys.stderr)
         return 1
 
-    global _logger
-    _logger = get_pbench_logger(_NAME_, config)
+    logger = get_pbench_logger(_NAME_, config)
+
+    # Add the BACKUP and QDIR fields to the config object for convenience.
+    config.BACKUP = config.conf.get("pbench-server", "pbench-backup-dir")
+    config.QDIR = config.get('pbench-server', 'pbench-quarantine-dir')
+
+    sanity_status = sanity_check(config, logger)
+    if sanity_status != 0:
+        return sanity_status
 
     # call the S3Config class
     s3_obj = S3Config(config)
 
-    _logger.info('start-{}'.format(config.timestamp()))
+    # make sure the S3 bucket exists
+    try:
+        s3_obj.connector.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
+    except Exception:
+        logger.exception(
+            "Bucket: {} does not exist or you have no access\n".format(s3_obj.bucket_name))
+        s3_obj = None
 
-    # add a BACKUP field to the config object
-    config.BACKUP = config.conf.get("pbench-server", "pbench-backup-dir")
-    config.QDIR = config.get('pbench-server', 'pbench-quarantine-dir')
-
-    sanity_check(s3_obj, config, _logger)
-
-    prog = os.path.basename(sys.argv[0])
+    logger.info('start-{}'.format(config.timestamp()))
 
     # Initiate the backup
-    counts = backup_data(s3_obj, config, _logger)
+    counts = backup_data(s3_obj, config, logger)
 
     result_string = ("Total processed: {}, "
                      "Locally backed-ed succesfully: {}, "
@@ -429,7 +416,9 @@ def main(parsed):
                             counts.ns3_fail,
                             counts.nquaran))
 
-    _logger.info(result_string)
+    logger.info(result_string)
+
+    prog = os.path.basename(sys.argv[0])
 
     # prepare and send report
     with tempfile.NamedTemporaryFile(mode='w+t', dir=config.TMP) as report:
@@ -437,21 +426,16 @@ def main(parsed):
             prog, config.timestamp(), config.PBENCH_ENV, result_string))
         report.seek(0)
 
-        es, idx_prefix = init_report_template(config, _logger)
+        es, idx_prefix = init_report_template(config, logger)
         # Call report-status
-        report_status(es, _logger, config.LOGSDIR,
+        report_status(es, logger, config.LOGSDIR,
                       idx_prefix, _NAME_, config.timestamp(), "status", (pathlib.Path(report.name)))
 
-    _logger.info('end-{}'.format(config.timestamp()))
+    logger.info('end-{}'.format(config.timestamp()))
 
-    return ret_status
+    return 0
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser("""Usage: pbench-backup""")
-    parser.set_defaults(cfg_name=os.environ.get("CONFIG"))
-    parser.set_defaults(tmpdir=os.environ.get("TMPDIR"))
-    parsed = parser.parse_args()
-
-    status = main(parsed)
+    status = main()
     sys.exit(status)
