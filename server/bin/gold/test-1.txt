@@ -108,7 +108,7 @@ drwxrwxr-x          - logs/pbench-backup-tarballs
 drwxrwxr-x          - logs/pbench-index
 -rw-rw-r--        158 logs/pbench-index/pbench-index.log
 drwxrwxr-x          - logs/pbench-verify-backup-tarballs
--rw-rw-r--        351 logs/pbench-verify-backup-tarballs/pbench-verify-backup-tarballs.log
+-rw-rw-r--        221 logs/pbench-verify-backup-tarballs/pbench-verify-backup-tarballs.log
 drwxrwxr-x          - pbench-move-results-receive
 drwxrwxr-x          - pbench-move-results-receive/fs-version-001
 drwxrwxr-x          - pbench-move-results-receive/fs-version-002
@@ -170,7 +170,6 @@ drwxrwxr-x          - tmp
 1970-01-01T00:00:00.000000 ERROR pbench-index.pbench-index main -- pbench-index: Bad ARCHIVE=/var/tmp/pbench-test-server/test-1/pbench/archive/fs-version-001
 ----- pbench-index/pbench-index.log
 +++++ pbench-verify-backup-tarballs/pbench-verify-backup-tarballs.log
-1970-01-01T00:00:00.000000 INFO pbench-verify-backup-tarballs.pbench-verify-backup-tarballs main -- start-1900-01-01T00:00:00-UTC
 1970-01-01T00:00:00.000000 ERROR pbench-verify-backup-tarballs.pbench-verify-backup-tarballs main -- The ARCHIVE directory does not resolve to a directory, /var/tmp/pbench-test-server/test-1/pbench/archive/fs-version-001
 ----- pbench-verify-backup-tarballs/pbench-verify-backup-tarballs.log
 ---- pbench-local/logs

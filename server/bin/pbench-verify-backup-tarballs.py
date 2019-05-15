@@ -9,12 +9,12 @@ import shutil
 import tempfile
 import pathlib
 from argparse import ArgumentParser
-
+from s3backup import S3Config, Entry
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger
-from s3backup import S3Config, Entry
 
-_NAME_    = "pbench-verify-backup-tarballs"
+
+_NAME_ = "pbench-verify-backup-tarballs"
 
 # Global logger for the module, setup in main()
 _logger = None
@@ -22,34 +22,39 @@ _logger = None
 def checkmd5(target_dir, list_dir, indicator):
     # Function to check integrity of results in a local (archive or local backup) directory
     if not os.path.isdir(target_dir):
-        _logger.error('Bad {}: {}'.format(indicator, target_dir))
+        _logger.error("Bad {}: {}", indicator, target_dir)
         os._exit(1)
     tarlist = glob.iglob(os.path.join(target_dir, "*", "*.tar.xz"))
-    with open("{}/list.{}".format(list_dir, indicator), 'w') as f_list:
+    with open(os.path.join(list_dir, "list.{}".format(indicator)), 'w') as f_list:
         for tar in tarlist:
             result_name = os.path.basename(tar)
             controller = os.path.basename(os.path.dirname(tar))
             md5 = ("{}.md5".format(tar))
-            f_list.write("{}\n".format(result_name))
+            f_list.write("{}\n".format(os.path.join(controller, result_name)))
             with open(md5) as f:
                 md5_value = f.readline().split(" ")[0]
             with open(tar, 'rb') as f:
+                # FIXME
+                # Do the same thing here as we did in pbench-backup-tarballs
+                # to avoid reading the entire file into memory first. Move
+                # the md5sum method to lib/pbench/__init__.py so it can be
+                # shared by both.
                 data = f.read()
                 md5_returned = hashlib.md5(data).hexdigest()
             if md5_value == md5_returned:
-                with open("{}/list.{}.ok".format(list_dir, indicator), 'w') as f_ok:
+                with open(os.path.join(list_dir, "list.{}.ok".format(indicator)), 'w') as f_ok:
                     f_ok.write(
-                        "{}/{}: {}\n".format(controller, result_name, "OK"))
-            elif md5 != md5_returned:
-                with open("{}/list.{}.fail".format(list_dir, indicator), 'w') as f_fail:
+                        "{}: {}\n".format(os.path.join(controller, result_name), "OK"))
+            else:
+                with open(os.path.join(list_dir, "list.{}.fail".format(indicator)), 'w') as f_fail:
                     f_fail.write(
-                        "{}/{}: {}\n".format(controller, result_name, "FAILED"))
+                        "{}: {}\n".format(os.path.join(controller, result_name), "FAILED"))
 
 
 def report_failed_md5(list_dir, archive, backup, report):
     ret = 0
-    archive_fail = '{}/list.archive.fail'.format(list_dir)
-    archive_ok = '{}/list.archive.ok'.format(list_dir)
+    archive_fail = os.path.join(list_dir, 'list.archive.fail')
+    archive_ok = os.path.join(list_dir, 'list.archive.ok')
     if os.path.exists(archive_fail) and os.path.getsize(archive_fail) > 0:
         with open(archive_fail) as f:
             failed_list_a = f.read()
@@ -60,8 +65,8 @@ def report_failed_md5(list_dir, archive, backup, report):
         report.write("Archive list is empty - is {} mounted?\n".format(archive))
         ret = 7
 
-    backup_fail = '{}/list.backup.fail'.format(list_dir)
-    backup_ok = '{}/list.backup.ok'.format(list_dir)
+    backup_fail = os.path.join(list_dir, 'list.backup.fail')
+    backup_ok = os.path.join(list_dir, 'list.backup.ok')
     if os.path.exists(backup_fail) and os.path.getsize(backup_fail) > 0:
         with open(backup_fail) as f:
             failed_list_b = f.read()
@@ -72,15 +77,15 @@ def report_failed_md5(list_dir, archive, backup, report):
     else:
         report.write("Backup list is empty - is {} mounted?\n".format(backup))
         ret = 8
-    if ret != 0:
-        return ret
-    else:
-        pass
+    return ret
 
 
-def compare_local_backup_with_s3_backup(s3_obj, config, list_dir, report):
+def compare_local_backup_with_s3_backup(config, list_dir, report):
+    # call the s3config class
+    s3_obj = S3Config(config)
+
     # Function to check intergrity of results between local backup and s3
-    with open("{}/list.s3".format(list_dir), 'w') as f_list:
+    with open(os.path.join(list_dir, "list.s3"), 'w') as f_list:
         s3_content_list = []
         while True:
             resp = s3_obj.connector.list_objects(Bucket=s3_obj.bucket_name)
@@ -93,16 +98,16 @@ def compare_local_backup_with_s3_backup(s3_obj, config, list_dir, report):
             except KeyError:
                 break
     try:
-        with open("{}/list.backup".format(list_dir)) as f:
+        with open(os.path.join(list_dir, "list.backup")) as f:
             backup_content = f.readlines()
-    except Exception as e:
-        _logger.warning("{}/list.backup: file not found".format(list_dir))
+    except Exception:
+        _logger.exception("error reading from {}", os.path.join(list_dir, "list.backup"))
 
     backup_content_list = []
     for content in backup_content:
         result_name = content.strip("\n")
-        local_result_path = glob.glob(os.path.join(config.BACKUP, "*", result_name))
-        local_result_md5 = ("{}.md5".format(local_result_path[0]))
+        local_result_path = os.path.join(config.BACKUP, result_name)
+        local_result_md5 = "{}.md5".format(local_result_path)
         with open(local_result_md5) as k:
             md5_local = k.readline().split(" ")[0]
         backup_content_list.append(Entry(result_name, md5_local))
@@ -120,10 +125,10 @@ def compare_local_backup_with_s3_backup(s3_obj, config, list_dir, report):
             j += 1
         elif sorted_s3_content[i].name == sorted_backup_content[j].name:
             # the md5s are different even though the names are the same
-            _logger.warning("Md5 check failed for: {}\n".format(
-                sorted_s3_content[i].name))
-            report.write("Md5 check failed for: {}\n".format(
-                sorted_s3_content[i].name))
+            report_text = "Md5 check failed for: {}\n".format(
+                sorted_s3_content[i].name)
+            _logger.warning(report_text)
+            report.write(report_text)
             i += 1
             j += 1
         elif sorted_s3_content[i].name < sorted_backup_content[j].name:
@@ -147,47 +152,51 @@ def compare_local_backup_with_s3_backup(s3_obj, config, list_dir, report):
 
 def report_primary_backup_s3(list_dir, report):
     # Function to compare archive, backup and s3
+    aname = os.path.join(list_dir, "list.archive")
     try:
-        with open("{}/list.archive".format(list_dir)) as f:
+        with open(aname) as f:
             primary_list = set(f.readlines())
-    except Exception as e:
-        _logger.warning("{}/list.archive: file not found".format(list_dir))
+    except Exception:
+        _logger.exception("error reading {}", aname)
+        return
+    bname = os.path.join(list_dir, "list.backup")
     try:
-        with open("{}/list.backup".format(list_dir)) as f:
+        with open(bname) as f:
             backup_list = set(f.readlines())
-    except Exception as e:
-        _logger.warning("{}/list.backup: file not found".format(list_dir))
+    except Exception:
+        _logger.exception("error reading {}", bname)
+        return
+    sname = os.path.join(list_dir, "list.s3")
     try:
-        with open("{}/list.s3".format(list_dir)) as f:
+        with open(sname) as f:
             s3_list = set(f.readlines())
-    except Exception as e:
-        _logger.warning("{}/list.s3: file not found".format(list_dir))
+    except Exception:
+        _logger.exception("error reading {}", sname)
+        return
 
     only_p = primary_list.difference(backup_list, s3_list)
     for i in only_p:
         report.write("{}: only in archive\n".format(i.strip('\n')))
-        _logger.info("{}: only in archive\n".format(i.strip('\n')))
 
     only_b = backup_list.difference(primary_list, s3_list)
     for j in only_b:
         report.write("{}: only in backup\n".format(j.strip('\n')))
-        _logger.info("{}: only in backup\n".format(j.strip('\n')))
 
     only_s3 = s3_list.difference(primary_list, backup_list)
     for k in only_s3:
         report.write("{}: only in s3\n".format(k.strip('\n')))
-        _logger.info("{}: only in s3\n".format(k.strip('\n')))
 
 
-def main(parsed):
-    if not parsed.cfg_name:
+def main():
+    cfg_name = os.environ.get("CONFIG")
+    if not cfg_name:
         print("{}: ERROR: No config file specified; set CONFIG env variable or"
                 " use --config <file> on the command line".format(_NAME_),
                 file=sys.stderr)
         return 2
 
     try:
-        config = PbenchConfig(parsed.cfg_name)
+        config = PbenchConfig(cfg_name)
     except BadConfig as e:
         print("{}: {}".format(_NAME_, e), file=sys.stderr)
         return 1
@@ -195,29 +204,25 @@ def main(parsed):
     global _logger
     _logger = get_pbench_logger(_NAME_, config)
 
-    # call the s3config class
-    s3_obj = S3Config(config)
-
-    _logger.info('start-{}'.format(config.timestamp()))
-
     archive = config.ARCHIVE
     if not os.path.isdir(archive):
         _logger.error(
             'The ARCHIVE directory does not resolve to a directory, {}'.format(archive))
-        os._exit(1)
+        return 1
 
     # add a BACKUP field to the config object
-    config.BACKUP = config.conf.get("pbench-server", "pbench-backup-dir")
-    backup = config.BACKUP
+    config.BACKUP = backup = config.conf.get("pbench-server", "pbench-backup-dir")
     if len(backup) == 0:
         _logger.error(
             'Unspecified backup directory, no pbench-backup-dir config in pbench-server section')
-        os._exit(1)
+        return 1
 
     if not os.path.isdir(backup):
         _logger.error('Specified backup directory, {}, does not resolve {} to a directory'.format(
             backup, os.path.realpath(backup)))
-        os._exit(1)
+        return 1
+
+    _logger.info('start-{}'.format(config.timestamp()))
 
     prog = os.path.basename(sys.argv[0])
     with tempfile.TemporaryDirectory() as list_dir:
@@ -233,10 +238,10 @@ def main(parsed):
             sts = report_failed_md5(list_dir, archive, backup, reportf)
 
             # Compare local backup with s3 backup.
-            compare_local_backup_with_s3_backup(s3_obj, config, list_dir, reportf)
+            compare_local_backup_with_s3_backup(config, list_dir, reportf)
 
             if sts == 0:
-                # Make report of results only present in archive, backup and s3.
+                # Make report if results only present in archive, backup and s3.
                 report_primary_backup_s3(list_dir, reportf)
 
         with open(report, 'r+') as f:
@@ -255,10 +260,5 @@ def main(parsed):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser("""Usage: pbench-verify-backup""")
-    parser.set_defaults(cfg_name = os.environ.get("CONFIG"))
-    parser.set_defaults(tmpdir = os.environ.get("TMPDIR"))
-    parsed = parser.parse_args()
-
-    status = main(parsed)
+    status = main()
     sys.exit(status)
