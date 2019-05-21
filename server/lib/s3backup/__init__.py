@@ -60,14 +60,15 @@ class MockS3Connector(object):
 
     def list_objects(self, Bucket):
         ob_dict = {}
-        result_list = glob.glob(os.path.join(
-            self.path, Bucket, "*.tar.xz"))
+        bucketpath = os.path.join(self.path, Bucket)
+        result_list = glob.glob(os.path.join(bucketpath, "*/*.tar.xz"))
         result_name_list = []
         for i in result_list:
             with open(i, 'rb') as f:
                 data = f.read()
                 md5 = hashlib.md5(data).hexdigest()
-            result_name_list.append({'ETag': '"{}"'.format(md5), 'Key': i})
+            result_name_list.append({'ETag': '"{}"'.format(md5),
+                                     'Key': os.path.relpath(i, start=bucketpath)})
         ob_dict['Contents'] = result_name_list
         ob_dict['ResponseMetadata'] = {'HTTPStatusCode': 400}
         return ob_dict
