@@ -85,7 +85,8 @@ class MockS3Connector(object):
             except FileExistsError:
                 # directory already exists, ignore
                 pass
-            with open('{}/{}/{}.tar.xz'.format(self.path, self.bucket_name, Key), 'wb') as f:
+            with open('{}/{}/{}'.format(self.path, self.bucket_name, Key), 'wb') as f:
+                Body.seek(0)
                 f.write(Body.read())
 
     def head_bucket(self, Bucket):
