@@ -26,6 +26,17 @@ class BackupObject(object):
         self.list_name = "list.{}".format(self.name)
         self.description = self.name
 
+def sanity_check(s3_obj, logger):
+    # make sure the S3 bucket exists
+    try:
+        s3_obj.connector.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
+    except Exception:
+        logger.exception(
+            "Bucket: {} does not exist or you have no access\n".format(s3_obj.bucket_name))
+        s3_obj = None
+
+    return s3_obj
+
 def checkmd5(target_dir, tmpdir, backup_obj, logger):
     # Function to check integrity of results in a local (archive or local
     # backup) directory
@@ -103,7 +114,6 @@ def compare_with_s3_backup(s3_config_obj, backup_obj, tmpdir, report, logger):
                 s3_content_list = []
                 while True:
                     resp = s3_config_obj.connector.list_objects(s3_config_obj.bucket_name)
-                    # import pdb; pdb.set_trace()
                     for obj in resp['Contents']:
                         f_list.write("{}\n".format(obj['Key']))
                         md5_returned = obj['ETag'].strip("\"")
@@ -266,7 +276,7 @@ def main():
 
     # call the s3config class
     s3_config_obj = S3Config(config)
-    # XXX - test and set to None if bad
+    s3_config_obj = sanity_check(s3_config_obj, logger)
 
     # logger.info(s3_config_obj.connector.path)
     # logger.info(s3_config_obj.connector.bucket_name)
@@ -292,6 +302,9 @@ def main():
 
         with tempfile.NamedTemporaryFile(mode='w+t', dir=tmpdir) as report:
             report.write("{}.{}({})\n".format(prog, config.TS, config.PBENCH_ENV))
+
+            if s3_config_obj is None:
+                report.write('S3 backup service is inaccessible.')
 
             if md5_result_archive == Status.FAIL:
                 # create a report for failed md5 results from archive
