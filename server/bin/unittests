@@ -437,7 +437,7 @@ function _run_test {
     _dump_logs
     _verify_output ${testname}
     res=$?
-    _reset_state ${testname}
+#    _reset_state ${testname}
     return $res
 }
 
