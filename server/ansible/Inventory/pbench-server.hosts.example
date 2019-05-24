@@ -12,8 +12,12 @@
 host1            cenv=pbench-master
 host1sat         cenv=pbench-satellite
 
+# pbench_install_dir must be set to the same value as in the
+# pbench-server.spec file that is used to build the pbench server RPM.
+
 [servers:vars]
+pbench_install_dir = /opt/pbench-server
 configurl = http://pbench.example.com/server/config/{{ pbench_configuration_environment }}/pbench-server.cfg
-configdest = /opt/pbench-server/lib/config
+configdest = "{{ pbench_install_dir }}/lib/config"
 owner = pbench
 group = pbench

@@ -3,12 +3,26 @@
 # as facts, so they can be used in all subsequent roles. It is assumed
 # that the config file has already been installed on the server.
 
+# pbench install directory
+- name: fetch the pbench install directory from remote
+  shell: getconf.py install-dir pbench-server
+  register: cmd_output
+  environment:
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
+
+- set_fact:
+    pbench_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
+
+- debug:
+    msg: "{{ pbench_dir }}"
+    verbosity: 1
+
 # pbench top level directory
 - name: fetch the top-level pbench directory from remote
   shell: getconf.py pbench-top-dir pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -22,7 +36,7 @@
   shell: getconf.py pbench-logs-dir pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_logs_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -36,7 +50,7 @@
   shell: getconf.py pbench-tmp-dir pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_tmp_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -50,7 +64,7 @@
   shell: getconf.py pbench-quarantine-dir pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_quarantine_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -65,7 +79,7 @@
   register: cmd_output
   ignore_errors: yes
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_host_info_prefix: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -80,7 +94,7 @@
   register: cmd_output
   ignore_errors: yes
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_reception_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -94,23 +108,21 @@
   shell: getconf.py documentroot apache
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     httpd_document_root_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
 
-
 - debug:
     msg: "{{ httpd_document_root_dir }}"
     verbosity: 1
-
 
 # pbench owner
 - name: fetch the pbench owner
   shell: getconf.py user pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_user: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -124,7 +136,7 @@
   shell: getconf.py group pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_group: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -138,7 +150,7 @@
   shell: getconf.py host pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_host: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -152,7 +164,7 @@
   shell: getconf.py admin-email pbench-server
   register: cmd_output
   environment:
-    CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+    CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     mailaddr: "{{ cmd_output.stdout_lines[0].strip() }}"

@@ -8,4 +8,4 @@
 
   roles:
     - pbench-repo-install
-    - { role: rhel8-cert-install, when: ansible_distribution == 'RedHat' and ansible_distribution_major_version == '8' }
+

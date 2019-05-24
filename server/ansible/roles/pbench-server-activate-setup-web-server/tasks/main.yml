@@ -8,7 +8,7 @@
 - name: "copy the web-server bits to the <pbench>/public_html/static dir"
   delegate_to: "{{ inventory_hostname }}"
   synchronize:
-    src: "/opt/pbench-server/html/static/"
+    src: "{{ pbench_install_dir }}/html/static/"
     dest: "{{ pbench_dir }}/public_html/static"
     recursive: yes
-  
+

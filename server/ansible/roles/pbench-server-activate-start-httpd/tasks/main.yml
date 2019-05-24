@@ -14,7 +14,7 @@
   shell: getconf.py pbench-top-dir pbench-server
   register: cmd_output
   environment:
-        CONFIG: /opt/pbench-server/lib/config/pbench-server.cfg
+        CONFIG: "{{ pbench_install_dir }}/lib/config/pbench-server.cfg"
 
 - set_fact:
     pbench_dir: "{{ cmd_output.stdout_lines[0].strip() }}"
@@ -26,7 +26,7 @@
 - name: links in doc root to various pbench directories
   file:
     src: "{{ pbench_dir }}/public_html/{{ item }}"
-    path: /var/www/html/{{ item }}
+    path: "{{ httpd_document_root_dir }}/{{ item }}"
     state: link
   with_items:
     - incoming
