@@ -1,7 +1,7 @@
 ---
 # activate the server - create results dir structure
 
-- name: ensure archive and public_htmls directories and top-level subdirs are present
+- name: ensure archive and public_html directories and top-level subdirs are present
   file:
     path: "{{ pbench_dir }}/{{ item }}"
     owner: "{{ pbench_user }}"
