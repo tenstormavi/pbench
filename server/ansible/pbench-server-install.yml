@@ -12,6 +12,7 @@
     - pbench-repo-install
     - pbench-server-install
     - pbench-config-install
+    - pbench-server-deps
     - geerlingguy.apache
     - pbench-server-vars
     - pbench-server-activate-create-crontab
