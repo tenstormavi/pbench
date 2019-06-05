@@ -121,7 +121,7 @@ drwxrwxr-x          - logs/pbench-audit-server
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.error
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.log
 drwxrwxr-x          - logs/pbench-backup-tarballs
--rw-rw-r--       1530 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
+-rw-rw-r--       1538 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
 drwxrwxr-x          - logs/pbench-report-status
 -rw-rw-r--        372 logs/pbench-report-status/pbench-report-status.log
 drwxrwxr-x          - pbench-move-results-receive
@@ -189,9 +189,9 @@ drwxrwxr-x          - tmp
 ----- pbench-audit-server/pbench-audit-server.log
 +++++ pbench-backup-tarballs/pbench-backup-tarballs.log
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- start-1900-01-01T00:00:00-UTC
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Locally Backed-up Sucessfully: fio__2016-08-18_15:47:09.tar.xz#012
+1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Locally backed-up sucessfully: foo/fio__2016-08-18_15:47:09.tar.xz#012
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_s3 -- Upload to s3 succeeded: foo/fio__2016-08-18_15:47:09.tar.xz#012
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Locally Backed-up Sucessfully: pbench-user-benchmark__2016-08-24_21:32:01.tar.xz#012
+1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Locally backed-up sucessfully: foo/pbench-user-benchmark__2016-08-24_21:32:01.tar.xz#012
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_s3 -- Upload to s3 succeeded: foo/pbench-user-benchmark__2016-08-24_21:32:01.tar.xz#012
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- Total processed: 2, Locally backed-ed succesfully: 2, Failed to locally backed-up: 0, Uploaded to S3 succesfully: 2, Failed to upload to S3: 0, Quarantine: 0
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ update_templates -- done templates (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, retries: 0)

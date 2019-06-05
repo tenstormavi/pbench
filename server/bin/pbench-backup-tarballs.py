@@ -14,17 +14,20 @@ from s3backup import S3Config
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine, md5sum
 
+from botocore.exceptions import ConnectionClosedError, ClientError
+
 _NAME_ = "pbench-backup-tarballs"
 
 # The link source and destination for this operation of this script.
 _linksrc = "TO-BACKUP"
+_linklarge = "TO-BACKUP-LARGE"
 _linkdest = "BACKED-UP"
 
 
 class Status(Enum):
-    SUCCESS = 10
-    FAIL = 20
-
+    SUCCESS = 0
+    FAIL = 1
+    TOO_LARGE = 2
 
 class LocalBackupObject(object):
     def __init__(self, config):
@@ -145,7 +148,7 @@ def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, result
         else:
             # backup md5 file does not exist or it is not a regular file
             logger.error(
-                "{} does not exist or it is not a regular file\n".format(backup_md5))
+                "{controller}{md5} does not exist or it is not a regular file\n".format(controller=controller, md5=backup_md5))
             return Status.FAIL
 
         # read backup md5 file
@@ -155,18 +158,18 @@ def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, result
         except (OSError, IOError) as e:
             # Could not read file
             logger.error(
-                "Could not read file {}, {}\n".format(backup_md5, e))
+                "Could not read file {md5}\nException info: {exc}\n".format(md5=backup_md5, exc=e))
             return Status.FAIL
         else:
             if archive_md5_hex_value == backup_md5_hex_value:
                 # declare success
                 logger.info(
-                    "Already locally backed-up: {}\n".format(resultname))
+                    "Already locally backed-up: {controller}/{tarball}\n".format(controller=controller, tarball=resultname))
                 return Status.SUCCESS
             else:
                 # md5 file of archive and backup does not match
                 logger.error(
-                    "{} already exists in backup but md5 sums of archive and backup disagree\n".format(resultname))
+                    "{controller}/{tarball} already exists in backup but md5 sums of archive and backup disagree\n".format(controller=controller, tarball=resultname))
                 return Status.FAIL
     else:
         tar_done = False
@@ -205,7 +208,7 @@ def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, result
 
         if md5_done and tar_done:
             logger.info(
-                "Locally Backed-up Sucessfully: {}\n".format(resultname))
+                "Locally backed-up sucessfully: {controller}/{tarball}\n".format(controller=controller, tarball=resultname))
             return Status.SUCCESS
         else:
             return Status.FAIL
@@ -235,11 +238,11 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
         if archive_md5_hex_value == s3_md5:
             # declare success
             logger.info(
-                "The tarball {} is already present in S3 bucket, with same md5\n".format(s3_resultname))
+                "The tarball {key} is already present in S3 bucket, with same md5\n".format(key=s3_resultname))
             return Status.SUCCESS
         else:
             logger.error(
-                "The tarball {} is already present in S3 bucket, but with different MD5\n".format(s3_resultname))
+                "The tarball {key} is already present in S3 bucket, but with different MD5\n".format(key=s3_resultname))
             return Status.FAIL
     else:
         md5_base64_value = (base64.b64encode(
@@ -249,18 +252,51 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
                 try:
                     s3_obj.connector.put_object(
                         Bucket=s3_obj.bucket_name, Key=s3_resultname, Body=data, ContentMD5=md5_base64_value)
+                except ConnectionClosedError as e:
+                    logger.error(
+                        "Upload to s3 failed, connection was reset while transferring {key}\n"\
+                        "This is a transient failure: it will be retried at the next invocation of {progname}.\n"\
+                        "Exception info: {exc}\n".
+                        format(key=s3_resultname, progname=_NAME_, exc=e))
+                    return Status.FAIL
+                except ClientError as e:
+                    # FIXME
+                    # We might need to distinguish other ClientErrors here, but for now
+                    # we assume that they are EntityTooLarge errors only.
+
+                    # FIXME
+                    # We well eventually implement multipart objects to take care of this
+                    # but for now, we return a special failure so that the link is moved
+                    # aside and we don't retry, but we save the links for eventual stashing
+                    # into S3. Verification will complain about these.
+
+                    logger.error(
+                        "Upload to s3 failed, EntityTooLarge for: {key}.\n"\
+                        "This is a permanent failure: it will not be retried "\
+                        "at the next invocation of {progname}.\n"\
+                        "Instead, we will stash the tarball away for later processing.\n"
+                        "Exception info: {exc}\n".
+                        format(key=s3_resultname, progname=_NAME_, exc=3))
+                    return Status.TOO_LARGE
                 except Exception as e:
                     logger.exception(
-                        "Upload to s3 failed, Bad md5 for: {}, {}\n".format(s3_resultname, e))
+                        "Upload to S3 failed while transferring {key},\n"\
+                        "with some other exception.\n"\
+                        "This will be retried at the next invocation of {progname}, "\
+                        "but it may be a bug and its resolution may require human intervention.\n"
+                        "Exception info: {exc}\n".
+                        format(key=s3_resultname,
+                               progname = _NAME_, exc=e))
                     return Status.FAIL
                 else:
                     logger.info(
-                        "Upload to s3 succeeded: {}\n".format(s3_resultname))
+                        "Upload to s3 succeeded: {key}\n".
+                        format(key=s3_resultname))
                     return Status.SUCCESS
         except (OSError, IOError) as e:
             # could not read tarball
             logger.error(
-                "Failed to open tarball, {}\n".format(tar, e))
+                "Failed to open tarball {tarball}\nException info: {exc}\n".format(tarball=tar, exc=e))
             return Status.FAIL
 
 
@@ -335,7 +371,7 @@ def backup_data(lb_obj, s3_obj, config, logger):
         controller = os.path.basename(controller_path)
 
         # This function call will handle all the local backup related
-        # operations and count the number of success and failure.
+        # operations and count the number of successes and failures.
         local_backup_result = backup_to_local(
             lb_obj, logger, controller_path, controller, tb, tar, resultname, archive_md5, archive_md5_hex_value)
 
@@ -356,6 +392,11 @@ def backup_data(lb_obj, s3_obj, config, logger):
             ns3_success += 1
         elif s3_backup_result == Status.FAIL:
             ns3_fail += 1
+        elif s3_backup_result == Status.TOO_LARGE:
+            # move it aside for later manual consideration
+            destdir = os.path.join(config.ARCHIVE, controller, _linklarge)
+            quarantine(destdir, logger, tb)
+            nquaran += 1
         else:
             assert False, "Impossible situation, s3_backup_result = {}".format(
                 s3_backup_result)

@@ -115,7 +115,7 @@ drwxrwxr-x          - logs/pbench-audit-server
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.error
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.log
 drwxrwxr-x          - logs/pbench-backup-tarballs
--rw-rw-r--       1213 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
+-rw-rw-r--       1217 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
 drwxrwxr-x          - logs/pbench-report-status
 -rw-rw-r--        372 logs/pbench-report-status/pbench-report-status.log
 drwxrwxr-x          - pbench-move-results-receive
@@ -183,7 +183,7 @@ drwxrwxr-x          - tmp
 ----- pbench-audit-server/pbench-audit-server.log
 +++++ pbench-backup-tarballs/pbench-backup-tarballs.log
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- start-1900-01-01T00:00:00-UTC
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Already locally backed-up: fio__2016-08-18_15:47:09.tar.xz#012
+1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Already locally backed-up: foo/fio__2016-08-18_15:47:09.tar.xz#012
 1970-01-01T00:00:00.000000 ERROR pbench-backup-tarballs.pbench-backup-tarballs backup_to_s3 -- The tarball foo/fio__2016-08-18_15:47:09.tar.xz is already present in S3 bucket, but with different MD5#012
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- Total processed: 1, Locally backed-ed succesfully: 1, Failed to locally backed-up: 0, Uploaded to S3 succesfully: 0, Failed to upload to S3: 1, Quarantine: 0
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ update_templates -- done templates (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, retries: 0)
