@@ -250,7 +250,7 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
             _status = Status.FAIL
         return _status
 
-    tb_size = os.path.getsize(tar)
+    tb_size = s3_obj.connector.getsize(tar)
     if tb_size > (5 * (1024 ** 3)):
         # FIXME: We will eventually implement multipart objects to take care
         # of this but for now, we return a special failure so that the link is

@@ -552,6 +552,8 @@ declare -A cmds=(
     [test-6.10]="_run pbench-backup-tarballs"
     # Upload successfull
     [test-6.11]="_run pbench-backup-tarballs"
+    # move to TO-BACKUP-LARGE since tar size is more than 5 GB
+    [test-6.12]="_run pbench-backup-tarballs"
     # Upload fail since md5 corrupt
     # TBD: right now, it is quite complicated to test this from the unit
     # test. Because in the initial check we evaluate whether the md5sum
@@ -627,6 +629,8 @@ declare -A cmds=(
     [test-9.5]="_run pbench-verify-backup-tarballs"
     # more tarballs in s3
     [test-9.6]="_run pbench-verify-backup-tarballs"
+    # check for Continuation Token
+    [test-9.7]="_run pbench-verify-backup-tarballs"
 
     # trivial results: no mail
     [test-10]="_run pbench-sync-satellite satellite-one"

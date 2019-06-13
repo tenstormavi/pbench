@@ -48,6 +48,9 @@ class S3Connector(object):
     def get_object(self, Bucket, Key):
         return self.s3connector.get_object(Bucket=Bucket, Key=Key)
 
+    def getsize(self, tar):
+        return os.path.getsize(tar)
+
 
 class MockS3Connector(object):
     """
@@ -58,10 +61,8 @@ class MockS3Connector(object):
         self.path = endpoint_url
         self.bucket_name = bucket_name
 
-    def list_objects(self, **kwargs):
-        ob_dict = {}
-        bucketpath = os.path.join(self.path, kwargs['Bucket'])
-        result_list = glob.glob(os.path.join(bucketpath, "*/*.tar.xz"))
+    def create_ob_dict_for_list_objects(self, ob_dict, bucketpath,
+    result_list):
         result_name_list = []
         for i in result_list:
             with open(i, 'rb') as f:
@@ -72,6 +73,29 @@ class MockS3Connector(object):
         ob_dict['Contents'] = result_name_list
         ob_dict['ResponseMetadata'] = {'HTTPStatusCode': 400}
         return ob_dict
+
+    def list_objects(self, **kwargs):
+        ob_dict = {}
+        bucketpath = os.path.join(self.path, kwargs['Bucket'])
+        result_list = glob.glob(os.path.join(bucketpath, "*/*.tar.xz"))
+        result_list.sort()
+        if kwargs['Bucket'] == "SPECIAL_BUCKET":
+            if 'ContinuationToken' in kwargs.keys():
+                resp = self.create_ob_dict_for_list_objects(ob_dict,
+                                                      bucketpath,
+                                                      result_list[2:])
+                return resp
+            else:
+                resp = self.create_ob_dict_for_list_objects(ob_dict,
+                                                      bucketpath,
+                                                      result_list[:2])
+                resp['NextContinuationToken'] = 'yes'
+                return resp
+        else:
+            resp = self.create_ob_dict_for_list_objects(ob_dict,
+                                                   bucketpath,
+                                                   result_list[:])
+            return resp
 
     def put_object(self, Bucket=None, Key=None, Body=None, ContentMD5=None):
         md5_hex_value = hashlib.md5(Body.read()).hexdigest()
@@ -106,6 +130,12 @@ class MockS3Connector(object):
         ob_dict['ResponseMetadata'] = {'HTTPStatusCode': 200}
         ob_dict['ETag'] = '"{}"'.format(md5)
         return ob_dict
+
+    def getsize(self, tar):
+        if '6.12' in tar:
+            return 6442450944  # equivalent to 6 GB
+        else:
+            return os.path.getsize(tar)
 
 
 class S3Config(object):
