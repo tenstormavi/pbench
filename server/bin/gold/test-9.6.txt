@@ -4,14 +4,14 @@ Index:  pbench-unittests-server-reports.1900-01 1
 len(actions) = 1
 [
     {
-        "_id": "c2e8b6603e3cb722f140e9c2bf64e4aa",
+        "_id": "62f439e6c73238bab9f33e2cb2daf689",
         "_index": "pbench-unittests-server-reports.1900-01",
         "_op_type": "create",
         "_source": {
             "@timestamp": "1900-01-01T00:00:00",
             "doctype": "status",
             "name": "pbench-verify-backup-tarballs",
-            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\ncontroller/fio__2016-08-16_22:03:11.tar.xz: present in s3 but not in archive\n"
+            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\ncontroller/fio__2016-08-16_22:03:11.tar.xz: present in S3 but not in ARCHIVE\n"
         },
         "_type": "pbench-server-reports"
     }

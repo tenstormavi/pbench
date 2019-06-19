@@ -13,7 +13,6 @@ from argparse import ArgumentParser
 from s3backup import S3Config
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine, md5sum
-
 from botocore.exceptions import ConnectionClosedError, ClientError
 
 _NAME_ = "pbench-backup-tarballs"
@@ -28,6 +27,7 @@ class Status(Enum):
     SUCCESS = 0
     FAIL = 1
     TOO_LARGE = 2
+
 
 class LocalBackupObject(object):
     def __init__(self, config):
@@ -48,7 +48,6 @@ class Results(object):
 
 
 def sanity_check(lb_obj, s3_obj, config, logger):
-
     # make sure archive is present
     archive = config.ARCHIVE
 
@@ -122,7 +121,6 @@ def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, result
         # Short-circuit operation when we don't have an lb object. This can
         # happen when the expected result of sanity check does not exist, or
         # for other errors where we still want to backup in S3.
-
         return Status.FAIL
 
     backup_controller_path = os.path.join(lb_obj.backup_dir, controller)
@@ -138,7 +136,7 @@ def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, result
             "os.mkdir: Unable to create backup destination directory: {}".format(backup_controller_path))
         return Status.FAIL
 
-    # Check if tarball exist in local backup
+    # Check if tarball exists in local backup
     backup_tar = os.path.join(backup_controller_path, resultname)
     if os.path.exists(backup_tar) and os.path.isfile(backup_tar):
         backup_md5 = os.path.join(
@@ -294,7 +292,7 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
 def backup_data(lb_obj, s3_obj, config, logger):
     qdir = config.QDIR
 
-    tarlist = glob.iglob('{}/*/{}/*.tar.xz'.format(config.ARCHIVE, _linksrc))
+    tarlist = glob.iglob(os.path.join(config.ARCHIVE, '*', _linksrc, '*.tar.xz'))
     ntotal = nbackup_success = nbackup_fail = \
         ns3_success = ns3_fail = nquaran = ns3_toolarge = 0
 
@@ -335,7 +333,7 @@ def backup_data(lb_obj, s3_obj, config, logger):
             # Could not read file.
             quarantine(qdir, logger, tb)
             nquaran += 1
-            logger.error(
+            logger.exception(
                 "Quarantine: {}, Could not read {}".format(tb, archive_md5))
             continue
 

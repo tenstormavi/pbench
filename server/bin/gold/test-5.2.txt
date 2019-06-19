@@ -171,14 +171,14 @@ Index:  pbench-unittests-server-reports.1900-01 1
 len(actions) = 1
 [
     {
-        "_id": "0bf7bba9b387ae36ccac420c45568550",
+        "_id": "7f89d9b20d621a1416994659d2993892",
         "_index": "pbench-unittests-server-reports.1900-01",
         "_op_type": "create",
         "_source": {
             "@timestamp": "1900-01-01T00:00:00",
             "doctype": "status",
             "name": "pbench-verify-backup-tarballs",
-            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\nMd5 check failed for: ONE::controllerA/tarball-simple1_YYYY-MM-DDTHH-mm-ss.tar.xz\nMd5 check failed for: ONE::controllerB/tarball-simple2_YYYY-MM-DDTHH-mm-ss.tar.xz\nMd5 check failed for: ONE::controllerC/tarball-simple0-prefix_YYYY-MM-DDTHH-mm-ss.tar.xz\nMd5 check failed for: controller-b-with-prefixes/tarball-0_YYYY.MM.DDTHH.MM.SS.tar.xz\nMd5 check failed for: controller-b-with-prefixes/tarball-w-dot-prefix_YYYY.MM.DDTHH.MM.SS.tar.xz\nMd5 check failed for: controller-b-with-prefixes/tarball-w-prefix-dot_YYYY.MM.DDTHH.MM.SS.tar.xz\nMd5 check failed for: controller-d-duplicate/tarball-duplicate_YYYY.MM.DDTHH.MM.SS.tar.xz\nMd5 check failed for: controller-g-normal/tarball-normal_YYYY.MM.DDTHH.MM.SS.tar.xz\n"
+            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\nMD5 values don't match for: ONE::controllerA/tarball-simple1_YYYY-MM-DDTHH-mm-ss.tar.xz\nMD5 values don't match for: ONE::controllerB/tarball-simple2_YYYY-MM-DDTHH-mm-ss.tar.xz\nMD5 values don't match for: ONE::controllerC/tarball-simple0-prefix_YYYY-MM-DDTHH-mm-ss.tar.xz\nMD5 values don't match for: controller-b-with-prefixes/tarball-0_YYYY.MM.DDTHH.MM.SS.tar.xz\nMD5 values don't match for: controller-b-with-prefixes/tarball-w-dot-prefix_YYYY.MM.DDTHH.MM.SS.tar.xz\nMD5 values don't match for: controller-b-with-prefixes/tarball-w-prefix-dot_YYYY.MM.DDTHH.MM.SS.tar.xz\nMD5 values don't match for: controller-d-duplicate/tarball-duplicate_YYYY.MM.DDTHH.MM.SS.tar.xz\nMD5 values don't match for: controller-g-normal/tarball-normal_YYYY.MM.DDTHH.MM.SS.tar.xz\n"
         },
         "_type": "pbench-server-reports"
     }
