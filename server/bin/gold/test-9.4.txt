@@ -4,14 +4,14 @@ Index:  pbench-unittests-server-reports.1900-01 1
 len(actions) = 1
 [
     {
-        "_id": "e4a27488bc2f13b4415dd58d91158a71",
+        "_id": "f4f5f488c57fec3b55d2fbd425ce5c76",
         "_index": "pbench-unittests-server-reports.1900-01",
         "_op_type": "create",
         "_source": {
             "@timestamp": "1900-01-01T00:00:00",
             "doctype": "status",
             "name": "pbench-verify-backup-tarballs",
-            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\nERROR: in archive: the calculated MD5 of the following entries failed to match the stored MD5:\ncontroller/pbench-user-benchmark_38_2016-05-18_19:36:32.tar.xz: FAILED\ncontroller/fio__2016-08-16_22:03:11.tar.xz: present in backup but not in s3\ncontroller/pbench-user-benchmark_38_2016-05-18_19:36:32.tar.xz: present in backup but not in s3\n"
+            "text": "pbench-verify-backup-tarballs.py.run-1900-01-01T00:00:00-UTC(unit-test)\nERROR: in archive: the calculated MD5 of the following entries failed to match the stored MD5:\ncontroller/pbench-user-benchmark_38_2016-05-18_19:36:32.tar.xz: FAILED\nMd5 check failed for: controller/pbench-user-benchmark_38_2016-05-18_19:36:32.tar.xz\ncontroller/fio__2016-08-16_22:03:11.tar.xz: present in archive but not in s3\ncontroller/pbench-user-benchmark_38_2016-05-18_19:36:32.tar.xz: present in archive but not in s3\n"
         },
         "_type": "pbench-server-reports"
     }

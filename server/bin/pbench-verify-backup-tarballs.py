@@ -43,14 +43,12 @@ def checkmd5(target_dir, tmpdir, backup_obj, logger):
     # Function to check integrity of results in a local (archive or local
     # backup) directory.
     # This function returns the count of results that failed the md5 sum
-    # check. That is used in main() as a measure of "goodness" in order to
-    # decide which local repository(the archive or the local backup) to use
-    # when comparing to the S3 backup repository. It returns sys.maxsize
-    # (practically infinity) to indicate catastrophic failure.
+    # check. That is used in main() to call the function 'report_failed_md5',
+    # for reporting the results that failed md5 sum.
 
     if not os.path.isdir(target_dir):
         logger.error('Bad {}: {}'.format(backup_obj.name, target_dir))
-        return sys.maxsize
+        return Status.FAIL
 
     tarlist = glob.iglob(os.path.join(target_dir, "*", "*.tar.xz"))
     indicator_file = os.path.join(tmpdir, backup_obj.list_name)
@@ -89,16 +87,17 @@ def checkmd5(target_dir, tmpdir, backup_obj, logger):
                             os.path.join(controller, result_name), "FAILED"))
             except Exception:
                 logger.exception("Error processing list of matching tar balls")
-                nfailed_md5 = sys.maxsize
+                return Status.FAIL
     except Exception:
         logger.exception(
             "Could not open one of the temp files for writing {}".
             format((indicator_file, indicator_file_ok, indicator_file_fail)))
-        nfailed_md5 = sys.maxsize
+        return Status.FAIL
     return nfailed_md5
 
 
 def report_failed_md5(backup_obj, tmpdir, report, logger):
+    # Function to report the results that failed md5 sum check.
     fail_f = os.path.join(tmpdir, "{}.fail".format(backup_obj.list_name))
     if os.path.exists(fail_f) and os.path.getsize(fail_f) > 0:
         try:
@@ -114,138 +113,104 @@ def report_failed_md5(backup_obj, tmpdir, report, logger):
                 "failed to match the stored MD5:\n{}".format(backup_obj.name, failed_list))
 
 
-def compare_with_s3_backup(s3_config_obj, backup_obj, tmpdir, report, logger):
+def compare_entry_lists(list_one_obj, list_two_obj, list_one, list_two, report):
+    # Compare the two lists and report the differences.
+    sorted_list_one_content = sorted(list_one, key=lambda k: k.name)
+    sorted_list_two_content = sorted(list_two, key=lambda k: k.name)
+    len_list_one_content = len(list_one)
+    len_list_two_content = len(list_two)
+    i, j = 0, 0
+    while (i < len_list_one_content) and (j < len_list_two_content):
+        if sorted_list_one_content[i] == sorted_list_two_content[j]:
+            i += 1
+            j += 1
+        elif sorted_list_one_content[i].name == sorted_list_two_content[j].name:
+            # the md5s are different even though the names are the same
+            report_text = "Md5 check failed for: {}\n".format(
+                sorted_list_one_content[i].name)
+            report.write(report_text)
+            i += 1
+            j += 1
+        elif sorted_list_one_content[i].name < sorted_list_two_content[j].name:
+            report_text = "{}: present in {} but not in {}\n".format(
+                                        sorted_list_one_content[i].name,
+                                        list_one_obj.description,
+                                        list_two_obj.description)
+            report.write(report_text)
+            i += 1
+        elif sorted_list_one_content[i].name > sorted_list_two_content[j].name:
+            report_text = "{}: present in {} but not in {}\n".format(
+                                        sorted_list_two_content[j].name,
+                                        list_two_obj.description,
+                                        list_one_obj.description)
+            report.write(report_text)
+            j += 1
+
+    if i == len_list_one_content and j < len_list_two_content:
+        for i in sorted_list_two_content[j:len_list_two_content]:
+            report_text = "{}: present in {} but not in {}\n".format(
+                                                    i.name,
+                                                    list_two_obj.description,
+                                                    list_one_obj.description)
+            report.write(report_text)
+    elif i < len_list_one_content and j == len_list_two_content:
+        for i in sorted_list_one_content[i:len_list_one_content]:
+            report_text = "{}: present in {} but not in {}\n".format(
+                                                    i.name,
+                                                    list_one_obj.description,
+                                                    list_two_obj.description)
+            report.write(report_text)
+
+
+def entry_list_creation(backup_obj, target_dir, logger):
+    # Function to create entry list for results in a local
+    # (archive or local backup) directory.
+    if not os.path.isdir(target_dir):
+        logger.error('Bad {}: {}'.format(backup_obj.name, target_dir))
+        return Status.FAIL
+
+    tarlist = glob.iglob(os.path.join(target_dir, "*", "*.tar.xz"))
+    content_list = []
+    for tar in tarlist:
+        result_name = os.path.basename(tar)
+        controller = os.path.basename(os.path.dirname(tar))
+        md5_file = "{}.md5".format(tar)
+        try:
+            with open(md5_file) as k:
+                md5 = k.readline().split(" ")[0]
+        except Exception:
+            logger.exception(
+                "Could not open the file {}".format(md5_file))
+            continue
+        else:
+            content_list.append(
+                Entry(os.path.join(controller, result_name), md5))
+    return content_list
+
+
+def entry_list_creation_s3(s3_config_obj, logger):
+    # Function to create entry list for results in S3.
     if s3_config_obj is None:
         return Status.FAIL
 
-    # Function to check integrity of results between archive/backup and s3
-    list_s3 = os.path.join(tmpdir, "list.s3")
+    s3_content_list = []
+    kwargs = {'Bucket': s3_config_obj.bucket_name}
     try:
-        with open(list_s3, 'w') as f_list:
+        while True:
+            resp = s3_config_obj.connector.list_objects(**kwargs)
+            for obj in resp['Contents']:
+                md5_returned = obj['ETag'].strip("\"")
+                s3_content_list.append(Entry(obj['Key'], md5_returned))
             try:
-                s3_content_list = []
-                kwargs = {'Bucket': s3_config_obj.bucket_name}
-                while True:
-                    resp = s3_config_obj.connector.list_objects(**kwargs)
-                    for obj in resp['Contents']:
-                        f_list.write("{}\n".format(obj['Key']))
-                        md5_returned = obj['ETag'].strip("\"")
-                        s3_content_list.append(Entry(obj['Key'], md5_returned))
-                    try:
-                        kwargs['ContinuationToken'] = resp['NextContinuationToken']
-                    except KeyError:
-                        break
-            except Exception:
-                logger.exception("Something went wrong while listing the objects from S3")
-                return Status.FAIL
+                kwargs['ContinuationToken'] = resp['NextContinuationToken']
+            except KeyError:
+                break
     except Exception:
         logger.exception(
-            "Could not open the file {}".format(list_s3))
-        return Status.FAIL
-
-    list_backup = os.path.join(tmpdir, backup_obj.list_name)
-    try:
-        with open(list_backup) as f:
-            backup_content = f.readlines()
-    except Exception:
-        logger.exception(
-            "Could not open the file {}".format(list_backup))
+            "Something went wrong while listing the objects from S3")
         return Status.FAIL
     else:
-        backup_content_list = []
-        for content in backup_content:
-            result_name = content.strip("\n")
-            local_result_path = os.path.join(backup_obj.dirname, result_name)
-            local_result_md5 = "{}.md5".format(local_result_path)
-            try:
-                with open(local_result_md5) as k:
-                    md5_local = k.readline().split(" ")[0]
-            except Exception:
-                logger.exception(
-                    "Could not open the file {}".format(local_result_md5))
-                continue
-            else:
-                backup_content_list.append(Entry(result_name, md5_local))
-
-    # Compare the two lists and report the differences.
-    sorted_s3_content = sorted(s3_content_list, key=lambda k: k.name)
-    sorted_backup_content = sorted(backup_content_list, key=lambda k: k.name)
-    len_s3_content = len(sorted_s3_content)
-    len_backup_content = len(sorted_backup_content)
-    i, j = 0, 0
-    while (i < len_s3_content) and (j < len_backup_content):
-        if sorted_s3_content[i] == sorted_backup_content[j]:
-            i += 1
-            j += 1
-        elif sorted_s3_content[i].name == sorted_backup_content[j].name:
-            # the md5s are different even though the names are the same
-            report_text = "Md5 check failed for: {}\n".format(
-                sorted_s3_content[i].name)
-            report.write(report_text)
-            i += 1
-            j += 1
-        elif sorted_s3_content[i].name < sorted_backup_content[j].name:
-            report_text = "{}: present in s3 but not in {}\n".format(
-                sorted_s3_content[i].name, backup_obj.description)
-            report.write(report_text)
-            i += 1
-        elif sorted_s3_content[i].name > sorted_backup_content[j].name:
-            report_text = "{}: present in {} but not in s3\n".format(
-                sorted_backup_content[j].name, backup_obj.description)
-            report.write(report_text)
-            j += 1
-
-    if i == len_s3_content and j < len_backup_content:
-        for i in sorted_backup_content[j:len_backup_content]:
-            report_text = "{}: present in {} but not in s3\n".format(
-                i.name, backup_obj.description)
-            report.write(report_text)
-    elif i < len_s3_content and j == len_backup_content:
-        for i in sorted_s3_content[i:len_s3_content]:
-            report_text = "{}: present in s3 but not in {}\n".format(
-                i.name, backup_obj.description)
-            report.write(report_text)
-    return Status.SUCCESS
-
-
-def report_primary_backup_s3(archive_obj, backup_obj, s3_backup_obj, tmpdir, report, logger):
-    # Function to compare archive, backup and s3
-    aname = os.path.join(tmpdir, archive_obj.list_name)
-    try:
-        with open(aname) as f:
-            primary_list = set(f.readlines())
-    except Exception:
-        logger.exception("error reading {}".format(aname))
-        return Status.FAIL
-
-    bname = os.path.join(tmpdir, backup_obj.list_name)
-    try:
-        with open(bname) as f:
-            backup_list = set(f.readlines())
-    except Exception:
-       logger.exception("error reading {}".format(bname))
-       return Status.FAIL
-
-    sname = os.path.join(tmpdir, s3_backup_obj.list_name)
-    try:
-        with open(sname) as f:
-            s3_list = set(f.readlines())
-    except Exception:
-        logger.exception("error reading {}".format(sname))
-        return Status.FAIL
-
-    only_p = primary_list.difference(backup_list, s3_list)
-    for i in sorted(only_p):
-        report.write("{}: only in archive\n".format(i.strip('\n')))
-
-    only_b = backup_list.difference(primary_list, s3_list)
-    for j in sorted(only_b):
-        report.write("{}: only in backup\n".format(j.strip('\n')))
-
-    only_s3 = s3_list.difference(primary_list, backup_list)
-    for k in sorted(only_s3):
-        report.write("{}: only in s3\n".format(k.strip('\n')))
-    return Status.SUCCESS
+        return s3_content_list
 
 
 def main():
@@ -297,6 +262,21 @@ def main():
         local_backup_obj = BackupObject("backup", config.BACKUP)
         s3_backup_obj = BackupObject("s3", s3_config_obj)
 
+        # Create entry list for archive
+        archive_entry_list = entry_list_creation(archive_obj, config.ARCHIVE, logger)
+        if archive_entry_list == Status.FAIL:
+            sts += 1
+
+        # Create entry list for backup
+        backup_entry_list = entry_list_creation(local_backup_obj, config.BACKUP, logger)
+        if backup_entry_list == Status.FAIL:
+            sts += 1
+
+        # Create entry list for S3
+        s3_entry_list = entry_list_creation_s3(s3_config_obj, logger)
+        if s3_entry_list == Status.FAIL:
+            sts += 1
+
         # Check the data integrity in Archive.
         md5_result_archive = checkmd5(config.ARCHIVE, tmpdir, archive_obj, logger)
 
@@ -319,31 +299,23 @@ def main():
                 report_failed_md5(local_backup_obj, tmpdir, report, logger)
                 sts += 1
 
-            if md5_result_archive <= md5_result_backup:
-                # Compare archive with s3 backup.
-                compare_result = compare_with_s3_backup(s3_config_obj,
-                                                        archive_obj,
-                                                        tmpdir, report, logger)
-            else:
-                # Compare local backup with s3 backup.
-                compare_result = compare_with_s3_backup(s3_config_obj,
-                                                        local_backup_obj,
-                                                        tmpdir, report, logger)
+            # Compare archive with local backup.
+            compare_entry_lists(archive_obj,
+                                local_backup_obj,
+                                archive_entry_list,
+                                backup_entry_list,
+                                report)
 
-            if compare_result == Status.FAIL:
-                sts += 1
-
-            diff_status = report_primary_backup_s3(archive_obj,
-                                                   local_backup_obj,
-                                                   s3_backup_obj,
-                                                   tmpdir, report, logger)
-            if diff_status == Status.FAIL:
-                sts += 1
-
-            # Send the report out.
+            # Compare archive with s3 backup.
+            compare_entry_lists(archive_obj,
+                                s3_backup_obj,
+                                archive_entry_list,
+                                s3_entry_list,
+                                report)
 
             # Rewind to the beginning.
             report.seek(0)
+            # Send the report out.
             es, idx_prefix = init_report_template(config, logger)
             report_status(es, logger, config.LOGSDIR,
                           idx_prefix, _NAME_, config.TS, "status", report.name)
