@@ -10,7 +10,8 @@ import shutil
 import tempfile
 from enum import Enum
 from argparse import ArgumentParser
-from s3backup import S3Config
+from boto3.s3.transfer import TransferConfig
+from s3backup import S3Config, calculate_multipart_etag
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine, md5sum
 from botocore.exceptions import ConnectionClosedError, ClientError
@@ -19,14 +20,14 @@ _NAME_ = "pbench-backup-tarballs"
 
 # The link source and destination for this operation of this script.
 _linksrc = "TO-BACKUP"
-_linklarge = "TO-BACKUP-LARGE"
+_linketagfail = "ETAG-FAILED"
 _linkdest = "BACKED-UP"
 
 
 class Status(Enum):
     SUCCESS = 0
     FAIL = 1
-    TOO_LARGE = 2
+    ETAG_FAILURE = 2
 
 
 class LocalBackupObject(object):
@@ -37,14 +38,14 @@ class LocalBackupObject(object):
 
 class Results(object):
     def __init__(self, ntotal=0, nbackup_success=0, nbackup_fail=0,
-                 ns3_success=0, ns3_fail=0, nquaran=0, ns3_toolarge=0):
+                 ns3_success=0, ns3_fail=0, nquaran=0, ns3_etag_fail=0):
         self.ntotal = ntotal
         self.nbackup_success = nbackup_success
         self.nbackup_fail = nbackup_fail
         self.ns3_success = ns3_success
         self.ns3_fail = ns3_fail
         self.nquaran = nquaran
-        self.ns3_toolarge = ns3_toolarge
+        self.ns3_etag_fail = ns3_etag_fail
 
 
 def sanity_check(lb_obj, s3_obj, config, logger):
@@ -248,45 +249,8 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
             _status = Status.FAIL
         return _status
 
-    tb_size = s3_obj.connector.getsize(tar)
-    if tb_size > (5 * (1024 ** 3)):
-        # FIXME: We will eventually implement multipart objects to take care
-        # of this but for now, we return a special failure so that the link is
-        # moved aside and we don't retry, but we save the links for eventual
-        # stashing into S3. Verification will complain about these.
-        logger.warning("Tar ball, {}, too large to upload", tar)
-        return Status.TOO_LARGE
-
-    md5_base64_value = (base64.b64encode(
-        bytes.fromhex(archive_md5_hex_value))).decode()
-    try:
-        with open(tar, 'rb') as data:
-            try:
-                s3_obj.connector.put_object(
-                    Bucket=s3_obj.bucket_name, Key=s3_resultname, Body=data, ContentMD5=md5_base64_value)
-            except ConnectionClosedError:
-                # This is a transient failure and will be retried at the next
-                # invocation of the backups.
-                logger.error(
-                    "Upload to s3 failed, connection was reset while transferring {key}".format(
-                        key=s3_resultname))
-                return Status.FAIL
-            except Exception:
-                # What ever the reason is for this failure, the operation will
-                # be retried the next time backups are run.
-                logger.exception(
-                    "Upload to S3 failed while transferring {key}".format(
-                        key=s3_resultname))
-                return Status.FAIL
-            else:
-                logger.info(
-                    "Upload to s3 succeeded: {key}".format(key=s3_resultname))
-                return Status.SUCCESS
-    except Exception:
-        # could not read tarball
-        logger.exception(
-            "Failed to open tarball {tarball}".format(tarball=tar))
-        return Status.FAIL
+    sts = s3_obj.connector.upload_object(tar, s3_resultname, archive_md5_hex_value, s3_obj.bucket_name, logger, Status)
+    return sts
 
 
 def backup_data(lb_obj, s3_obj, config, logger):
@@ -294,7 +258,7 @@ def backup_data(lb_obj, s3_obj, config, logger):
 
     tarlist = glob.iglob(os.path.join(config.ARCHIVE, '*', _linksrc, '*.tar.xz'))
     ntotal = nbackup_success = nbackup_fail = \
-        ns3_success = ns3_fail = nquaran = ns3_toolarge = 0
+        ns3_success = ns3_fail = nquaran = ns3_etag_fail = 0
 
     for tb in sorted(tarlist):
         ntotal += 1
@@ -381,8 +345,8 @@ def backup_data(lb_obj, s3_obj, config, logger):
             ns3_success += 1
         elif s3_backup_result == Status.FAIL:
             ns3_fail += 1
-        elif s3_backup_result == Status.TOO_LARGE:
-            ns3_toolarge += 1
+        elif s3_backup_result == Status.ETAG_FAILURE:
+            ns3_etag_fail += 1
         else:
             assert False, "Impossible situation, s3_backup_result = {!r}".format(
                 s3_backup_result)
@@ -393,11 +357,11 @@ def backup_data(lb_obj, s3_obj, config, logger):
             _rename_tb_link(tb, os.path.join(
                 controller_path, _linkdest), logger)
         elif local_backup_result == Status.SUCCESS \
-                and s3_backup_result == Status.TOO_LARGE:
+                and s3_backup_result == Status.ETAG_FAILURE:
             # Move tar ball symlink to indicate we still need to deal with all
             # the tar balls that are too large.
             _rename_tb_link(tb, os.path.join(
-                controller_path, _linklarge), logger)
+                controller_path, _linketagfail), logger)
         else:
             # Do nothing when the backup fails, allowing us to retry on a
             # future pass.
@@ -409,7 +373,7 @@ def backup_data(lb_obj, s3_obj, config, logger):
                    ns3_success=ns3_success,
                    ns3_fail=ns3_fail,
                    nquaran=nquaran,
-                   ns3_toolarge=ns3_toolarge)
+                   ns3_etag_fail=ns3_etag_fail)
 
 
 def main():
@@ -460,7 +424,7 @@ def main():
                              counts.nbackup_success,
                              counts.nbackup_fail,
                              counts.ns3_success,
-                             counts.ns3_toolarge,
+                             counts.ns3_etag_fail,
                              counts.ns3_fail,
                              counts.nquaran))
 

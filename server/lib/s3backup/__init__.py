@@ -26,8 +26,32 @@ class Entry(object):
         return self.name == other.name and self.md5 == other.md5
 
 
+def calculate_multipart_etag(source_path, chunk_size):
+    md5s = []
+
+    with open(source_path,'rb') as fp:
+        while True:
+            data = fp.read(chunk_size)
+            if not data:
+                break
+            md5s.append(hashlib.md5(data))
+
+    if len(md5s) > 1:
+        digests = b"".join(m.digest() for m in md5s)
+        new_md5 = hashlib.md5(digests)
+        new_etag = '%s-%s' % (new_md5.hexdigest(),len(md5s))
+    else:
+        new_etag = ''
+
+    return new_etag
+
+
 class S3Connector(object):
     def __init__(self, access_key_id, secret_access_key, endpoint_url, bucket_name):
+        self.GB = 1024 ** 3
+        self.MB = 1024 ** 2
+        self.chunk_size = 256 * self.MB
+        self.multipart_threshold = 5 * self.GB
         self.s3connector = boto3.client('s3',
                                         aws_access_key_id='{}'.format(
                                             access_key_id),
@@ -38,10 +62,6 @@ class S3Connector(object):
     def list_objects(self, **kwargs):
         return self.s3connector.list_objects_v2(**kwargs)
 
-    def put_object(self, Bucket, Key, Body, ContentMD5):
-        return self.s3connector.put_object(Bucket=Bucket, Key=Key,
-                Body=Body, ContentMD5=ContentMD5)
-
     def head_bucket(self, Bucket):
         return self.s3connector.head_bucket(Bucket=Bucket)
 
@@ -51,6 +71,80 @@ class S3Connector(object):
     def getsize(self, tar):
         return os.path.getsize(tar)
 
+    def upload_object(self, tar, s3_resultname, archive_md5_hex_value, bucket_name, logger, Status):
+        md5_base64_value = (base64.b64encode(bytes.fromhex(archive_md5_hex_value))).decode()
+        tb_size = self.s3connector.getsize(tar)
+        if tb_size > (5 * self.GB):
+            multi_upload_config = TransferConfig(
+                                                multipart_threshold=self.multipart_threshold, multipart_chunksize=self.chunk_size)
+            # calculate multi etag value
+            local_multipart_etag = calculate_multipart_etag(tar, self.chunk_size)
+            try:
+                with open(tar, "rb") as f:
+                    try:
+                        self.s3connector.upload_fileobj(f,
+                                                        Bucket=bucket_name,
+                                                        Key=s3_resultname,
+                                                        Config = multi_upload_config,
+                                                        ExtraArgs = {'Metadata': { 'ETAG-MD5': local_multipart_etag, 'MD5SUM': archive_md5_hex_value}})
+                    except ClientError as e:
+                        logger.error(
+                        "Multi-upload to s3 failed, client error: {}".format(e)
+                        )
+                        return Status.FAIL
+                    else:
+                        # compare the multi etag value uploaded in metadata
+                        # field with s3 etag for data integrity.
+                        try:
+                            obj = self.s3connector.get_object(Bucket='{}'.format(bucket_name), Key='{}'.format(s3_resultname))
+                        except Exception:
+                            logger.exception("get_object failed: {}".format(s3_resultname))
+                            return Status.FAIL
+                        else:
+                            s3_multipart_etag = obj['ETag'].strip("\"")
+                            if s3_multipart_etag == local_multipart_etag:
+                                logger.info("Multi-upload to s3 succeeded: {key}".format(key=s3_resultname))
+                                return Status.SUCCESS
+                            else:
+                                # delete object from s3 and move to specific
+                                # state directory for retry
+                                self.s3connector.delete_object(Bucket='{}'.format(bucket_name), Key='{}'.format(s3_resultname))
+                                logger.error("Multi-upload to s3 failed: {key},etag doesn't matched so moving it to ETAG_FAILURE for inspection".format(key=s3_resultname))
+                                return Status.ETAG_FAILURE
+            except Exception:
+                # could not read tarball
+                logger.exception(
+                    "Failed to open tarball {tarball}".format(tarball=tar))
+                return Status.FAIL
+        else:
+            try:
+                with open(tar, 'rb') as data:
+                    try:
+                        self.s3connector.put_object(
+                            Bucket=bucket_name, Key=s3_resultname, Body=data, ContentMD5=md5_base64_value)
+                    except ConnectionClosedError:
+                        # This is a transient failure and will be retried at
+                        # the next invocation of the backups.
+                        logger.error(
+                            "Upload to s3 failed, connection was reset while transferring {key}".format(key=s3_resultname))
+                        return Status.FAIL
+                    except Exception:
+                        # What ever the reason is for this failure, the
+                        # operation will be retried the next time backups
+                        # are run.
+                        logger.exception(
+                            "Upload to S3 failed while transferring {key}".format(key=s3_resultname))
+                        return Status.FAIL
+                    else:
+                        logger.info(
+                            "Upload to s3 succeeded: {key}".format(key=s3_resultname))
+                        return Status.SUCCESS
+            except Exception:
+                # could not read tarball
+                logger.exception(
+                    "Failed to open tarball {tarball}".format(tarball=tar))
+                return Status.FAIL
+
 
 class MockS3Connector(object):
     """
@@ -58,6 +152,7 @@ class MockS3Connector(object):
     """
 
     def __init__(self, access_key_id, secret_access_key, endpoint_url, bucket_name):
+        self.GB = 1024 ** 3
         self.path = endpoint_url
         self.bucket_name = bucket_name
 
@@ -112,6 +207,22 @@ class MockS3Connector(object):
             with open('{}/{}/{}'.format(self.path, self.bucket_name, Key), 'wb') as f:
                 f.write(Body.read())
 
+    def upload_fileobj(self, read_content=None, Bucket=None, Key=None, Config=None, ExtraArgs=None):
+        test_controller = Key.split("/")[0]
+        try:
+            os.mkdir("{}/{}/{}".format(self.path,
+                                        self.bucket_name, test_controller))
+        except FileExistsError:
+            # directory already exists, ignore
+            pass
+        with open('{}/{}/{}'.format(self.path, self.bucket_name, Key), 'wb') as f:
+            f.write(read_content.read())
+
+    def delete_object(self, Bucket, Key):
+        object_path = "{}/{}/{}".format(self.path, self.bucket_name, Key)
+        if os.path.exists(object_path):
+            os.remove(object_path)
+
     def head_bucket(self, Bucket):
         if os.path.exists(os.path.join(self.path, Bucket)):
             ob_dict = {}
@@ -137,6 +248,25 @@ class MockS3Connector(object):
         else:
             return os.path.getsize(tar)
 
+    def upload_object(self, tar, s3_resultname, archive_md5_hex_value, bucket_name, logger, Status):
+        tb_size = self.getsize(tar)
+        if tb_size > (5 * self.GB):
+            pass
+        else:
+            with open(tar, "rb") as data:
+                md5_hex_value = hashlib.md5(data.read()).hexdigest()
+                if md5_hex_value == archive_md5_hex_value:
+                    test_controller = s3_resultname.split("/")[0]
+                    try:
+                        os.mkdir("{}/{}/{}".format(self.path,
+                                                self.bucket_name, test_controller))
+                    except FileExistsError:
+                        # directory already exists, ignore
+                        pass
+                    with open('{}/{}/{}'.format(self.path, self.bucket_name, s3_resultname), 'wb') as f:
+                        f.write(data.read())
+        return Status.SUCCESS
+
 
 class S3Config(object):
     def __init__(self, config):
@@ -158,3 +288,4 @@ class S3Config(object):
         else:
             self.connector = S3Connector(
                 self.access_key_id, self.secret_access_key, self.endpoint_url, self.bucket_name)
+
