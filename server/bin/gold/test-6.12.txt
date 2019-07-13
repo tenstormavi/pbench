@@ -4,14 +4,14 @@ Index:  pbench-unittests-server-reports.1900-01 1
 len(actions) = 1
 [
     {
-        "_id": "70377a4bcbb500257e718c7107ef0d56",
+        "_id": "89a6b3907303d7f7cc254d764aa17c76",
         "_index": "pbench-unittests-server-reports.1900-01",
         "_op_type": "create",
         "_source": {
             "@timestamp": "1900-01-01T00:00:00",
             "doctype": "status",
             "name": "pbench-backup-tarballs",
-            "text": "pbench-backup-tarballs.py.1900-01-01T00:00:00-UTC(unit-test)\nTotal processed: 1, Local backup successes: 1, Local backup failures: 0, S3 upload successes: 0, SE upload too large: 1, S3 upload failures: 0, Quarantined: 0\n"
+            "text": "pbench-backup-tarballs.py.1900-01-01T00:00:00-UTC(unit-test)\nTotal processed: 1, Local backup successes: 1, Local backup failures: 0, S3 upload successes: 1, SE upload too large: 0, S3 upload failures: 0, Quarantined: 0\n"
         },
         "_type": "pbench-server-reports"
     }
@@ -78,9 +78,9 @@ lrwxrwxrwx         72 users -> /var/tmp/pbench-test-server/test-6.12/pbench-sate
 drwxrwxr-x          - archive
 drwxrwxr-x          - archive/fs-version-001
 drwxrwxr-x          - archive/fs-version-001/foo
+drwxrwxr-x          - archive/fs-version-001/foo/BACKED-UP
+lrwxrwxrwx         34 archive/fs-version-001/foo/BACKED-UP/fio__2016-08-18_15:47:09.tar.xz -> ../fio__2016-08-18_15:47:09.tar.xz
 drwxrwxr-x          - archive/fs-version-001/foo/TO-BACKUP
-drwxrwxr-x          - archive/fs-version-001/foo/TO-BACKUP-LARGE
-lrwxrwxrwx         34 archive/fs-version-001/foo/TO-BACKUP-LARGE/fio__2016-08-18_15:47:09.tar.xz -> ../fio__2016-08-18_15:47:09.tar.xz
 -rw-r--r--    1610896 archive/fs-version-001/foo/fio__2016-08-18_15:47:09.tar.xz
 -rw-r--r--         66 archive/fs-version-001/foo/fio__2016-08-18_15:47:09.tar.xz.md5
 drwxrwxr-x          - public_html
@@ -116,7 +116,7 @@ drwxrwxr-x          - logs/pbench-audit-server
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.error
 -rw-rw-r--          0 logs/pbench-audit-server/pbench-audit-server.log
 drwxrwxr-x          - logs/pbench-backup-tarballs
--rw-rw-r--       1251 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
+-rw-rw-r--       1019 logs/pbench-backup-tarballs/pbench-backup-tarballs.log
 drwxrwxr-x          - logs/pbench-report-status
 -rw-rw-r--        372 logs/pbench-report-status/pbench-report-status.log
 drwxrwxr-x          - pbench-move-results-receive
@@ -183,8 +183,7 @@ drwxrwxr-x          - tmp
 +++++ pbench-backup-tarballs/pbench-backup-tarballs.log
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- start-run-1900-01-01T00:00:00-UTC
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs backup_to_local -- Already locally backed-up: foo/fio__2016-08-18_15:47:09.tar.xz
-1970-01-01T00:00:00.000000 WARNING pbench-backup-tarballs.pbench-backup-tarballs backup_to_s3 -- Tar ball, /var/tmp/pbench-test-server/test-6.12/pbench/archive/fs-version-001/foo/fio__2016-08-18_15:47:09.tar.xz, too large to upload
-1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- Total processed: 1, Local backup successes: 1, Local backup failures: 0, S3 upload successes: 0, SE upload too large: 1, S3 upload failures: 0, Quarantined: 0
+1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- Total processed: 1, Local backup successes: 1, Local backup failures: 0, S3 upload successes: 1, SE upload too large: 0, S3 upload failures: 0, Quarantined: 0
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ update_templates -- done templates (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, retries: 0)
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.__init__ report_status -- posted status (end ts: 1970-01-01T00:00:00-GMT, duration: 0.00s, successes: 1, duplicates: 0, failures: 0, retries: 0)
 1970-01-01T00:00:00.000000 INFO pbench-backup-tarballs.pbench-backup-tarballs main -- end-run-1900-01-01T00:00:00-UTC
