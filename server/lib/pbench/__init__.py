@@ -233,7 +233,7 @@ class PbenchConfig(object):
                 " TO-LINK" \
                 " TO-INDEX INDEXED WONT-INDEX" \
                 " TO-COPY-SOS COPIED-SOS" \
-                " TO-BACKUP TO-BACKUP-LARGE BACKED-UP" \
+                " TO-BACKUP BACKED-UP ETAG-FAILED" \
                 " SATELLITE-MD5-PASSED SATELLITE-MD5-FAILED" \
                 " TO-DELETE SATELLITE-DONE"
         # List of the state directories which will be excluded during rsync.

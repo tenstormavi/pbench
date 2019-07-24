@@ -308,7 +308,7 @@ def main():
             report.write("{}.{}({})\n".format(prog, config.TS, config.PBENCH_ENV))
 
             try:
-                # Check the data integrity in ARCHIVE (Question 1).
+                # Check the data integrity in ARCHIVE.
                 md5_result_archive = checkmd5(config.ARCHIVE, tmpdir, archive_obj, logger)
             except Exception:
                 msg = "Failed to check data integrity of ARCHIVE ({})".format(config.ARCHIVE)
@@ -317,12 +317,12 @@ def main():
                 sts += 1
             else:
                 if md5_result_archive > 0:
-                    # Create a report for failed MD5 results from ARCHIVE (Question 1)
+                    # Create a report for failed MD5 results from ARCHIVE.
                     report_failed_md5(archive_obj, tmpdir, report, logger)
                     sts += 1
 
             try:
-                # Check the data integrity in BACKUP (Question 2).
+                # Check the data integrity in BACKUP.
                 md5_result_backup = checkmd5(config.BACKUP, tmpdir, local_backup_obj, logger)
             except Exception:
                 msg = "Failed to check data integrity of BACKUP ({})".format(config.BACKUP)
@@ -330,11 +330,11 @@ def main():
                 report.write("{}\n".format(msg))
             else:
                 if md5_result_backup > 0:
-                    # Create a report for failed MD5 results from BACKUP (Question 2)
+                    # Create a report for failed MD5 results from BACKUP.
                     report_failed_md5(local_backup_obj, tmpdir, report, logger)
                     sts += 1
 
-            # Compare ARCHIVE with BACKUP (Questions 3 and 3a).
+            # Compare ARCHIVE with BACKUP.
             compare_entry_lists(archive_obj,
                                 local_backup_obj,
                                 archive_entry_list,
@@ -344,7 +344,7 @@ def main():
             if s3_config_obj is None:
                 report.write('S3 backup service is inaccessible.\n')
             else:
-                # Compare ARCHIVE with S3 (Questions 4, 4a, and 4b).
+                # Compare ARCHIVE with S3.
                 compare_entry_lists(archive_obj,
                                     s3_backup_obj,
                                     archive_entry_list,
