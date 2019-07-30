@@ -70,7 +70,7 @@ class BackupObject(object):
 def sanity_check(s3_obj, logger):
     # make sure the S3 bucket exists
     try:
-        s3_obj.connector.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
+        s3_obj.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
     except Exception:
         logger.exception(
             "Bucket: {} does not exist or you have no access\n".format(s3_obj.bucket_name))
@@ -224,7 +224,7 @@ def entry_list_creation_s3(s3_config_obj, logger):
     kwargs = {'Bucket': s3_config_obj.bucket_name}
     try:
         while True:
-            resp = s3_config_obj.connector.list_objects(**kwargs)
+            resp = s3_config_obj.list_objects(**kwargs)
             for obj in resp['Contents']:
                 md5_returned = obj['ETag'].strip("\"")
                 s3_content_list.append(Entry(obj['Key'], md5_returned))

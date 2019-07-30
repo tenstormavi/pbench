@@ -8,10 +8,9 @@ import base64
 import hashlib
 import shutil
 import tempfile
-from enum import Enum
 from argparse import ArgumentParser
 from boto3.s3.transfer import TransferConfig
-from s3backup import S3Config, calculate_multipart_etag
+from s3backup import S3Config, calculate_multipart_etag, Status
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine, md5sum
 from botocore.exceptions import ConnectionClosedError, ClientError
@@ -22,12 +21,6 @@ _NAME_ = "pbench-backup-tarballs"
 _linksrc = "TO-BACKUP"
 _linketagfail = "ETAG-FAILED"
 _linkdest = "BACKED-UP"
-
-
-class Status(Enum):
-    SUCCESS = 0
-    FAIL = 1
-    ETAG_FAILURE = 2
 
 
 class LocalBackupObject(object):
@@ -108,7 +101,7 @@ def sanity_check(lb_obj, s3_obj, config, logger):
 
     # make sure the S3 bucket exists
     try:
-        s3_obj.connector.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
+        s3_obj.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
     except Exception:
         logger.exception(
             "Bucket: {} does not exist or you have no access".format(s3_obj.bucket_name))
@@ -229,8 +222,8 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
 
     # Check if the result already present in s3 or not
     try:
-        obj = s3_obj.connector.get_object(Bucket='{}'.format(
-            s3_obj.bucket_name), Key='{}'.format(s3_resultname))
+        obj = s3_obj.get_tarball_header(Bucket=s3_obj.bucket_name,
+                                Key=s3_resultname)
     except Exception:
         s3_md5 = None
     else:
@@ -249,7 +242,8 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
             _status = Status.FAIL
         return _status
 
-    sts = s3_obj.connector.upload_object(tar, s3_resultname, archive_md5_hex_value, s3_obj.bucket_name, logger, Status)
+    with open(tar, 'rb') as f:
+        sts = s3_obj.put_tarball(Body=f, ContentMD5=archive_md5_hex_value,  Bucket=s3_obj.bucket_name, Key=s3_resultname)
     return sts
 
 
@@ -401,7 +395,7 @@ def main():
     lb_obj = LocalBackupObject(config)
 
     # call the S3Config class
-    s3_obj = S3Config(config)
+    s3_obj = S3Config(config, logger)
 
     lb_obj, s3_obj = sanity_check(lb_obj, s3_obj, config, logger)
 
