@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from argparse import ArgumentParser
 from boto3.s3.transfer import TransferConfig
-from s3backup import S3Config, calculate_multipart_etag, Status
+from s3backup import S3Config, Status
 from pbench import init_report_template, report_status, _rename_tb_link, \
     PbenchConfig, BadConfig, get_es, get_pbench_logger, quarantine, md5sum
 from botocore.exceptions import ConnectionClosedError, ClientError
@@ -95,13 +95,13 @@ def sanity_check(lb_obj, s3_obj, config, logger):
         lb_obj = None
 
     if not os.path.isdir(qdir):
-        logger.error(
-            'The QUARANTINE directory {}, does not resolve {} to a directory'.format(qdir, os.path.realpath(qdir)))
+        logger.error("The QUARANTINE directory {} does not resolve {}"
+                     " to a directory".format(qdir, os.path.realpath(qdir)))
         lb_obj = None
 
     # make sure the S3 bucket exists
     try:
-        s3_obj.head_bucket(Bucket='{}'.format(s3_obj.bucket_name))
+        s3_obj.head_bucket(Bucket=s3_obj.bucket_name)
     except Exception:
         logger.exception(
             "Bucket: {} does not exist or you have no access".format(s3_obj.bucket_name))
@@ -109,8 +109,9 @@ def sanity_check(lb_obj, s3_obj, config, logger):
 
     return (lb_obj, s3_obj)
 
-
-def backup_to_local(lb_obj, logger, controller_path, controller, tb, tar, resultname, archive_md5, archive_md5_hex_value):
+def backup_to_local(lb_obj, logger, controller_path, controller, tb,
+                    tar, resultname, archive_md5,
+                    archive_md5_hex_value):
     if lb_obj is None:
         # Short-circuit operation when we don't have an lb object. This can
         # happen when the expected result of sanity check does not exist, or
@@ -242,8 +243,12 @@ def backup_to_s3(s3_obj, logger, controller_path, controller, tb, tar, resultnam
             _status = Status.FAIL
         return _status
 
+    size = s3_obj.getsize(tar)
     with open(tar, 'rb') as f:
-        sts = s3_obj.put_tarball(Body=f, ContentMD5=archive_md5_hex_value,  Bucket=s3_obj.bucket_name, Key=s3_resultname)
+        sts = s3_obj.put_tarball(Name=tar, Body=f, Size=size,
+                                 ContentMD5=archive_md5_hex_value,
+                                 Bucket=s3_obj.bucket_name,
+                                 Key=s3_resultname)
     return sts
 
 
