@@ -273,8 +273,8 @@ def main():
         logger.error("The setting for BACKUP in the config file is {}, but that is not a directory", backup)
         return 1
 
-    # call the s3config class
-    s3_config_obj = S3Config(config)
+    # instantiate the s3config class
+    s3_config_obj = S3Config(config, logger)
     s3_config_obj = sanity_check(s3_config_obj, logger)
 
     logger.info('start-{}', config.TS)
